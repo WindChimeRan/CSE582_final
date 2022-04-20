@@ -577,6 +577,8 @@ class SQLNet(nn.Module):
                     cur_query["conds"].append(cur_cond)
             ret_queries.append(cur_query)
 
+        # print(ret_queries)
+        # exit()
         return ret_queries
 
     def predict_SQL_with_EG(self, engine, dataset, beam_size=5, model_outputs=None):

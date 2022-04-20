@@ -4,9 +4,28 @@
 
 python 3.8.8, pytorch 1.9.0
 
-python -u train.py --sd saved_model_kg > hzz5361_train.log 2> hzz5361_train.err &
-python -u test.py --sd saved_model_kg > hzz5361_train.log 2> hzz5361_train.err 
+    pip install records==0.5.2
+    pip install SQLAlchemy==1.1.14
 
+
+    python -u train.py --sd saved_model_kg > hzz5361_train.log 2> hzz5361_train.err &
+
+    python -u test.py --sd saved_model_kg > hzz5361_train.log 2> hzz5361_train.err 
+
+or run 
+
+    bash run_test.sh
+
+## Original model, epoch 10
+
+    Dev acc_qm: 0.6435866983372922;
+      breakdown on (agg, sel, where): [0.89928741 0.92541568 0.75486936 0.96377672 0.89287411 0.98087886
+    0.91733967]
+    Dev execution acc: 0.7098574821852731
+    Test acc_qm: 0.6385967122252315;
+      breakdown on (agg, sel, where): [0.89884739 0.91572715 0.74894501 0.96290231 0.88454998 0.98066385
+    0.92082887]
+    Test execution acc: 0.7052339862694463
 
 ## TODO
 
