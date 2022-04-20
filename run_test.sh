@@ -1,0 +1,1 @@
+python -u test.py --sd saved_model_kg
