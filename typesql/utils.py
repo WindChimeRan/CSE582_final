@@ -265,8 +265,17 @@ def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path, db_content)
 
 
 def epoch_acc(
-    model, batch_size, sql_data, table_data, pred_entry, db_content, error_print=False
+    model,
+    batch_size,
+    sql_data,
+    table_data,
+    pred_entry,
+    db_path,
+    db_content,
+    error_print=False,
 ):
+    engine = DBEngine(db_path)
+
     model.eval()
     perm = list(range(len(sql_data)))
     st = 0
@@ -293,8 +302,11 @@ def epoch_acc(
         query_gt, table_ids = to_batch_query(sql_data, perm, st, ed)
         gt_sel_seq = [x[1] for x in ans_seq]
         score = model.forward(q_seq, col_seq, col_num, q_type, col_type, pred_entry)
-        pred_queries = model.gen_query(
-            score, q_seq, col_seq, raw_q_seq, raw_col_seq, pred_entry
+        # pred_queries = model.gen_query(
+        #     score, q_seq, col_seq, raw_q_seq, raw_col_seq, pred_entry
+        # )
+        pred_queries = model.gen_execution_guided_query(
+            score, q_seq, col_seq, raw_q_seq, raw_col_seq, pred_entry, table_ids, engine
         )
         one_err, tot_err = model.check_acc(
             raw_data, pred_queries, query_gt, pred_entry, error_print

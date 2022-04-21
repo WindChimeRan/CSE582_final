@@ -95,7 +95,13 @@ if __name__ == "__main__":
     print(
         "Dev acc_qm: %s;\n  breakdown on (agg, sel, where): %s"
         % epoch_acc(
-            model, BATCH_SIZE, val_sql_data, val_table_data, TEST_ENTRY, args.db_content
+            model,
+            BATCH_SIZE,
+            val_sql_data,
+            val_table_data,
+            TEST_ENTRY,
+            DEV_DB,
+            args.db_content,
         )
     )
     print(
@@ -112,6 +118,7 @@ if __name__ == "__main__":
             test_sql_data,
             test_table_data,
             TEST_ENTRY,
+            TEST_DB,
             args.db_content,
         )
     )
