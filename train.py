@@ -96,7 +96,13 @@ if __name__ == "__main__":
 
     # initial accuracy
     init_acc = epoch_acc(
-        model, BATCH_SIZE, val_sql_data, val_table_data, TRAIN_ENTRY, args.db_content
+        model,
+        BATCH_SIZE,
+        val_sql_data,
+        val_table_data,
+        TRAIN_ENTRY,
+        TRAIN_DB,
+        args.db_content,
     )
     best_agg_acc = init_acc[1][0]
     best_agg_idx = 0
