@@ -27,8 +27,16 @@ or run
     0.92082887]
     Test execution acc: 0.7052339862694463
 
-## TODO
+## typesql with execution-guided decoding
 
+    Dev acc_qm: 0.994418052256532;
+      breakdown on (agg, sel, where): [0.99916865 0.99809976 0.9956057  0.99916865 0.997981   0.99976247
+    0.99869359]
+    Dev execution acc: 0.7098574821852731
+    Test acc_qm: 0.9942054544309379;
+      breakdown on (agg, sel, where): [0.99829943 0.99924419 0.99609498 0.99911822 0.99817346 0.99974806
+    0.99905524]
+    Test execution acc: 0.7052339862694463
 
 Merge
 

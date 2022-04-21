@@ -544,7 +544,7 @@ class SQLNet(nn.Module):
                 ret = ret + tok
             return ret.strip()
 
-        def beam_search(score, pred_entry, table_ids, beam=5):
+        def beam_search(score, pred_entry, table_ids, beam_cond=5):
 
             # pass
             pred_agg, pred_sel, pred_cond = pred_entry
@@ -566,6 +566,7 @@ class SQLNet(nn.Module):
                 B = len(cond_num_score)
             for b in range(B):
                 cur_query = {}
+                tid = table_ids[b]
                 if pred_agg:
                     # TODO fix all the argmax with topk beam search.
                     cur_query["agg"] = np.argmax(agg_score[b].data.cpu().numpy())
@@ -575,11 +576,23 @@ class SQLNet(nn.Module):
                     cur_query["conds"] = []
                     cond_num = np.argmax(cond_num_score[b])
                     all_toks = [["<BEG>"]] + q[b] + [["<END>"]]
-                    max_idxes = np.argsort(-cond_col_score[b])[:cond_num]
-                    for idx in range(cond_num):
+                    # max_idxes = np.argsort(-cond_col_score[b])[:cond_num]
+                    max_idxes = np.argsort(-cond_col_score[b])[:beam_cond]
+                    # for idx in range(cond_num):
+                    # print(cond_num)
+                    # print(cond_num_score.shape)
+                    # print("-----" * 20)
+                    cond_cnt = 0
+                    for idx in range(4):
                         cur_cond = []
                         cur_cond.append(max_idxes[idx])
+                        # try:
                         cur_cond.append(np.argmax(cond_op_score[b][idx]))
+                        #     print(cond_op_score.shape)
+                        # except:
+                        #     print("err")
+                        #     print(cond_op_score.shape)
+
                         cur_cond_str_toks = []
                         for str_score in cond_str_score[b][idx]:
                             str_tok = np.argmax(str_score[: len(all_toks)])
@@ -589,33 +602,66 @@ class SQLNet(nn.Module):
                             # add string word/grouped words to current cond str tokens ["w1", "w2" ...]
                             cur_cond_str_toks.append(str_val)
                         cur_cond.append(merge_tokens(cur_cond_str_toks, raw_q[b]))
-                        cur_query["conds"].append(cur_cond)
 
+                        # execuate
+                        exe_query_one_where = {
+                            "agg": cur_query["agg"],
+                            "sel": cur_query["sel"],
+                            "conds": [cur_cond],
+                        }
+
+                        ret_is_empty = False
+                        ret_pred = None
+                        try:
+                            # tid = table_ids[b]
+                            ret_pred = engine.execute(
+                                tid,
+                                exe_query_one_where["sel"],
+                                exe_query_one_where["agg"],
+                                exe_query_one_where["conds"],
+                            )
+                            if ret_pred is None:
+                                ret_is_empty = True
+                            else:
+                                ret_is_empty = False
+                        except:
+                            ret_is_empty = True
+
+                        if ret_is_empty:
+
+                            print("found error or empty when execution")
+                        else:
+                            cond_cnt += 1
+                            cur_query["conds"].append(cur_cond)
+                            # print("return something")
+
+                        if cond_cnt >= cond_num:
+                            break
                 ret_queries.append(cur_query)
 
                 return ret_queries
 
         ret_queries = beam_search(score, pred_entry, table_ids)
 
-        for pred_query, tid in zip(ret_queries, table_ids):
-            ret_is_empty = False
-            ret_pred = None
-            try:
-                # tid = table_ids[b]
-                ret_pred = engine.execute(
-                    tid, pred_query["sel"], pred_query["agg"], pred_query["conds"]
-                )
-                if ret_pred is None:
-                    ret_is_empty = True
-                else:
-                    ret_is_empty = False
-            except:
-                ret_is_empty = True
+        # for pred_query, tid in zip(ret_queries, table_ids):
+        #     ret_is_empty = False
+        #     ret_pred = None
+        #     try:
+        #         # tid = table_ids[b]
+        #         ret_pred = engine.execute(
+        #             tid, pred_query["sel"], pred_query["agg"], pred_query["conds"]
+        #         )
+        #         if ret_pred is None:
+        #             ret_is_empty = True
+        #         else:
+        #             ret_is_empty = False
+        #     except:
+        #         ret_is_empty = True
 
-            if ret_is_empty:
-                print("found error or empty when execution")
-            else:
-                print("return something")
+        #     if ret_is_empty:
+        #         print("found error or empty when execution")
+        #     else:
+        #         print("return something")
         # print(ret_queries)
         # exit()
         return ret_queries
