@@ -1,5 +1,29 @@
 ## TypeSQL
 
+## thoughts
+
+The problem I found:
+
+https://arxiv.org/pdf/2008.04759.pdf the execuation-guided decoding is described in page 9. 
+There are two parts of decoding: 1. Get top-k1 predicted aggregation-SELECT pairs, 2. Get top-k2 predicted conditions
+
+However, according to their code in 
+https://github.com/lyuqin/HydraNet-WikiSQL/blob/master/modeling/base_model.py#L59
+
+They only argmax the top1 possible aggregation-SELECT. The 2nd part is fine. In other words, they only implement half of what they said. 
+
+Should we implement the first part by ourselves? Maybe, maybe not. According to the experiments part of typesql, the most challenging prediction is the condition or where clauses. Then choosing the top1 select part may not be a sub-optimal idea. 
+
+Another problem: The paper argues that their algorithm is a kind of beam search, while I don't think so. 
+
+A general definition of beam search: https://en.wikipedia.org/wiki/Beam_search
+general beam search in a nutshell: It's a greedy algorithm, and does not gurantee global optimal solution. 
+NLP beam search in a nutshell: Instead of enumerating all possible prediction of sequence, beam search keeps a fix-size cache of topk local optimal solution until 1, 2, 3 ... n, and gradually expand it to the whole sequence. 
+
+In fact, the algorithm in the paper enumerate all possible predictions of the conditions. Then I don't think it's a beam search.
+
+
+
 ## Haoran quick start
 
 python 3.8.8, pytorch 1.9.0
@@ -17,6 +41,12 @@ or run
     bash run_test.sh
 
 ## Original model, epoch 10
+
+
+{'agg': 3, 'sel': 2, 'conds': [[0, 2, 'a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a']]}
+{'agg': 3, 'sel': 1, 'conds': []}
+
+
 
     Dev acc_qm: 0.6435866983372922;
       breakdown on (agg, sel, where): [0.89928741 0.92541568 0.75486936 0.96377672 0.89287411 0.98087886

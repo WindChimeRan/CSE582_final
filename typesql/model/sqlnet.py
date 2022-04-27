@@ -547,6 +547,7 @@ class SQLNet(nn.Module):
         def beam_search(score, pred_entry, table_ids, beam_cond=5):
 
             # pass
+            trigger = False
             pred_agg, pred_sel, pred_cond = pred_entry
             agg_score, sel_cond_score, cond_op_str_score = score
 
@@ -629,8 +630,13 @@ class SQLNet(nn.Module):
 
                         if ret_is_empty:
 
-                            print("found error or empty when execution")
+                            # print("found error or empty when execution")
+                            trigger = True
+                            # print(exe_query_one_where)
                         else:
+                            # print("ok")
+                            # print(exe_query_one_where)
+
                             cond_cnt += 1
                             cur_query["conds"].append(cur_cond)
                             # print("return something")
@@ -638,7 +644,10 @@ class SQLNet(nn.Module):
                         if cond_cnt >= cond_num:
                             break
                 ret_queries.append(cur_query)
-
+                # if trigger:
+                #     print("!!"* 40)
+                #     print(ret_queries)
+                #     exit()
                 return ret_queries
 
         ret_queries = beam_search(score, pred_entry, table_ids)
@@ -753,6 +762,7 @@ class SQLNet(nn.Module):
                         cur_cond_str_toks.append(str_val)
                     cur_cond.append(merge_tokens(cur_cond_str_toks, raw_q[b]))
                     cur_query["conds"].append(cur_cond)
+                # print(cur_query)
             ret_queries.append(cur_query)
 
         # print(ret_queries)
@@ -798,80 +808,3 @@ class SQLNet(nn.Module):
             sqls.append((agg, select, conditions_with_value_texts))
 
         return sqls
-
-    def dataset_inference(self, dataset):
-        print("model prediction start")
-        start_time = time.time()
-        model_outputs = self.model_inference(dataset.model_inputs)
-
-        final_outputs = []
-        for pos in dataset.pos:
-            final_output = {}
-            for k in model_outputs:
-                final_output[k] = model_outputs[k][pos[0] : pos[1], :]
-            final_outputs.append(final_output)
-        print("model prediction end, time elapse: {0}".format(time.time() - start_time))
-        assert len(dataset.input_features) == len(final_outputs)
-
-        return final_outputs
-
-    def beam_parse_output(self, input_feature, model_output, beam_size=5):
-        def get_span(i):
-            offset = 0
-            segment_ids = np.array(input_feature.segment_ids[i])
-            for j in range(len(segment_ids)):
-                if segment_ids[j] == 1:
-                    offset = j
-                    break
-
-            value_start, value_end = (
-                model_output["value_start"][i, segment_ids == 1],
-                model_output["value_end"][i, segment_ids == 1],
-            )
-            l = len(value_start)
-            sum_mat = value_start.reshape((l, 1)) + value_end.reshape((1, l))
-            spans = []
-            for cur_span, sum_logp in sorted(
-                np.ndenumerate(sum_mat), key=lambda x: x[1], reverse=True
-            ):
-                if (
-                    cur_span[1] < cur_span[0]
-                    or cur_span[0] == l - 1
-                    or cur_span[1] == l - 1
-                ):
-                    continue
-                spans.append((cur_span[0] + offset, cur_span[1] + offset, sum_logp))
-                if len(spans) >= beam_size:
-                    break
-
-            return spans
-
-        select_id_prob = sorted(
-            enumerate(model_output["column_func"][:, 0]),
-            key=lambda x: x[1],
-            reverse=True,
-        )
-        select = select_id_prob[0][0]
-        agg = np.argmax(model_output["agg"][select, :])
-
-        where_id_prob = sorted(
-            enumerate(model_output["column_func"][:, 1]),
-            key=lambda x: x[1],
-            reverse=True,
-        )
-        where_num = self._get_where_num(model_output)
-        conditions = []
-        for idx, wlogp in where_id_prob[:beam_size]:
-            op = np.argmax(model_output["op"][idx, :])
-            for span in get_span(idx):
-                conditions.append((wlogp + span[2], idx, op, span[0], span[1]))
-        conditions.sort(key=lambda x: x[0], reverse=True)
-        return agg, select, where_num, conditions
-
-    def _get_where_num(self, output):
-        relevant_prob = 1 - np.exp(output["column_func"][:, 2])
-        where_num_scores = np.average(
-            output["where_num"], axis=0, weights=relevant_prob
-        )
-        where_num = int(np.argmax(where_num_scores))
-        return where_num

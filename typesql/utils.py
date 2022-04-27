@@ -243,9 +243,19 @@ def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path, db_content)
         score = model.forward(
             q_seq, col_seq, col_num, q_type, col_type, (True, True, True)
         )
-        pred_queries = model.gen_query(
-            score, q_seq, col_seq, raw_q_seq, raw_col_seq, (True, True, True)
+        pred_queries = model.gen_execution_guided_query(
+            score,
+            q_seq,
+            col_seq,
+            raw_q_seq,
+            raw_col_seq,
+            (True, True, True),
+            table_ids,
+            engine,
         )
+        # pred_queries = model.gen_query(
+        #     score, q_seq, col_seq, raw_q_seq, raw_col_seq, (True, True, True)
+        # )
 
         for idx, (sql_gt, sql_pred, tid) in enumerate(
             zip(query_gt, pred_queries, table_ids)
