@@ -276,10 +276,10 @@ def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path, db_content)
     print("Runtime Error triggered: ", model.error_predict_cnt)
     print("Total where: ", model.total_where_cnt)
     print("ratio /",  (model.error_predict_cnt + model.empty_cnt)/ model.total_where_cnt)
-    # for i, line in enumerate(model.cases):
-    #     print(line)
-    #     if i > 20:
-    #         break
+    for i, line in enumerate(model.cases[-40:]):
+        print(str(line) + " \\")
+        # if i > 20:
+        #     break
     model.error_predict_cnt = 0
     model.total_where_cnt = 0
     model.sel_cnt = 0
