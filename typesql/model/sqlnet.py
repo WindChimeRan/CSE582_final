@@ -73,7 +73,12 @@ class SQLNet(nn.Module):
         self.bce_logit = nn.BCEWithLogitsLoss()
         if gpu:
             self.cuda()
-
+        self.error_predict_cnt = 0
+        self.sel_cnt = 0
+        self.total_where_cnt = 0
+        self.empty_cnt = 0
+        
+        self.cases = []
     def get_str_index(self, all_toks, this_str):
         cur_seq = []
         tok_gt_1 = [t for t in all_toks if len(t) > 1]
@@ -379,7 +384,7 @@ class SQLNet(nn.Module):
         return loss
 
     def check_acc(
-        self, vis_info, pred_queries, gt_queries, pred_entry, error_print=False
+        self, vis_info, pred_queries, gt_queries, pred_entry, error_print=True
     ):
         def pretty_print(vis_data, pred_query, gt_query):
             print("\n----------detailed error prints-----------")
@@ -487,8 +492,188 @@ class SQLNet(nn.Module):
             ),
             tot_err,
         )
-
     def gen_execution_guided_query(
+        self,
+        score,
+        q,
+        col,
+        raw_q,
+        raw_col,
+        pred_entry,
+        table_ids,
+        engine,
+        verbose=False,
+    ):
+        def merge_tokens(tok_list, raw_tok_str):
+            """
+            tok_list: list of string words in current cond
+            raw_tok_str: list of words in question
+            """
+            tok_str = raw_tok_str.lower()
+            alphabet = "abcdefghijklmnopqrstuvwxyz0123456789$("
+            special = {
+                "-LRB-": "(",
+                "-RRB-": ")",
+                "-LSB-": "[",
+                "-RSB-": "]",
+                "``": '"',
+                "''": '"',
+                "--": "\u2013",
+            }
+            ret = ""
+            double_quote_appear = 0
+            tok_list = [x for gx in tok_list for x in gx]
+            for raw_tok in tok_list:
+                if not raw_tok:
+                    continue
+                tok = special.get(raw_tok, raw_tok)
+                if tok == '"':
+                    double_quote_appear = 1 - double_quote_appear
+
+                if len(ret) == 0:
+                    pass
+                elif len(ret) > 0 and ret + " " + tok in tok_str:
+                    ret = ret + " "
+                elif len(ret) > 0 and ret + tok in tok_str:
+                    pass
+                elif tok == '"':
+                    if double_quote_appear:
+                        ret = ret + " "
+                elif tok[0] not in alphabet:
+                    pass
+                elif (ret[-1] not in ["(", "/", "\u2013", "#", "$", "&"]) and (
+                    ret[-1] != '"' or not double_quote_appear
+                ):
+                    ret = ret + " "
+                ret = ret + tok
+            return ret.strip()
+
+        pred_agg, pred_sel, pred_cond = pred_entry
+        agg_score, sel_cond_score, cond_op_str_score = score
+
+        cond_num_score, sel_score, cond_col_score = [
+            x.data.cpu().numpy() for x in sel_cond_score
+        ]
+        cond_op_score, cond_str_score = [
+            x.data.cpu().numpy() for x in cond_op_str_score
+        ]
+
+        ret_queries = []
+        if pred_agg:
+            B = len(agg_score)
+        elif pred_sel:
+            B = len(sel_score)
+        elif pred_cond:
+            B = len(cond_num_score)
+        for b in range(B):
+            cur_query = {}
+            tid = table_ids[b]
+
+                
+            if pred_agg:
+                cur_query["agg"] = np.argmax(agg_score[b].data.cpu().numpy())
+            if pred_sel:
+                cur_query["sel"] = np.argmax(sel_score[b])
+            # sel hit?
+            exe_query_sel = {
+                "agg": cur_query["agg"],
+                "sel": cur_query["sel"],
+                "conds": [],
+            }
+            try:
+                # print(tid)
+                # print(exe_query_one_where)
+                # print("---")
+                # tid = table_ids[b]
+                tmp_pred = engine.execute(
+                    tid,
+                    exe_query_sel["sel"],
+                    exe_query_sel["agg"],
+                    exe_query_sel["conds"],
+                )
+                if tmp_pred is None:
+                    tmp_is_empty = True
+                else:
+                    tmp_is_empty = False
+                    # print("!!!!" * 50)
+            except:
+                tmp_is_empty = True
+            if tmp_is_empty:
+                self.sel_cnt += 1
+                
+                
+                
+                
+                
+            if pred_cond:
+                cur_query["conds"] = []
+                cond_num = np.argmax(cond_num_score[b])
+                all_toks = [["<BEG>"]] + q[b] + [["<END>"]]
+                max_idxes = np.argsort(-cond_col_score[b])[:5]
+                cond_cnt = 0
+                for idx in range(4):
+                    if cond_cnt == cond_num:
+                        break
+                    self.total_where_cnt += 1
+                    cur_cond = []
+                    cur_cond.append(max_idxes[idx])
+                    cur_cond.append(np.argmax(cond_op_score[b][idx]))
+                    cur_cond_str_toks = []
+                    for str_score in cond_str_score[b][idx]:
+                        str_tok = np.argmax(str_score[: len(all_toks)])
+                        str_val = all_toks[str_tok]
+                        if str_val == ["<END>"]:
+                            break
+                        # add string word/grouped words to current cond str tokens ["w1", "w2" ...]
+                        cur_cond_str_toks.append(str_val)
+                        
+                    cur_cond.append(merge_tokens(cur_cond_str_toks, raw_q[b]))
+                    # execuate
+
+                    
+                    exe_query_one_where = {
+                        "agg": cur_query["agg"],
+                        "sel": cur_query["sel"],
+                        "conds": [cur_cond],
+                    }
+
+                    ret_is_empty = False
+                    ret_pred = None
+                    try:
+                        # print(tid)
+                        # print(exe_query_one_where)
+                        # print("---")
+                        # tid = table_ids[b]
+                        ret_pred = engine.execute(
+                            tid,
+                            exe_query_one_where["sel"],
+                            exe_query_one_where["agg"],
+                            exe_query_one_where["conds"],
+                        )
+                        if ret_pred is None:
+                            ret_is_empty = True
+                            self.empty_cnt += 1
+                        else:
+                            ret_is_empty = False
+                            # print("!!!!" * 50)
+                    except:
+                        ret_is_empty = True
+                        self.error_predict_cnt += 1
+                        
+                    if not ret_is_empty:
+                        
+
+                        cur_query["conds"].append(cur_cond)
+                        cond_cnt += 1
+                    else:
+                        self.cases.append(exe_query_one_where)
+                    
+                # print(cur_query)
+            ret_queries.append(cur_query)
+
+        return ret_queries
+    
+    def gen_execution_guided_query_deprecate(
         self,
         score,
         q,
@@ -627,7 +812,9 @@ class SQLNet(nn.Module):
                                 ret_is_empty = False
                         except:
                             ret_is_empty = True
-
+                            
+                        # TODO: for debugging
+                        # ret_is_empty = False
                         if ret_is_empty:
 
                             # print("found error or empty when execution")

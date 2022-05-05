@@ -110,6 +110,13 @@ if __name__ == "__main__":
             model, BATCH_SIZE, val_sql_data, val_table_data, DEV_DB, args.db_content
         )
     )
+    # agg_err,
+    # sel_err,
+    # cond_err,
+    # cond_num_err,
+    # cond_col_err,
+    # cond_op_err,
+    # cond_val_err,
     print(
         "Test acc_qm: %s;\n  breakdown on (agg, sel, where): %s"
         % epoch_acc(

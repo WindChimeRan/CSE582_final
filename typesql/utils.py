@@ -270,7 +270,20 @@ def epoch_exec_acc(model, batch_size, sql_data, table_data, db_path, db_content)
             tot_acc_num += ret_gt == ret_pred
 
         st = ed
+    print("Sel triggered: ", model.sel_cnt)
+    print("Empty triggered: ", model.empty_cnt)
 
+    print("Runtime Error triggered: ", model.error_predict_cnt)
+    print("Total where: ", model.total_where_cnt)
+    print("ratio /",  (model.error_predict_cnt + model.empty_cnt)/ model.total_where_cnt)
+    # for i, line in enumerate(model.cases):
+    #     print(line)
+    #     if i > 20:
+    #         break
+    model.error_predict_cnt = 0
+    model.total_where_cnt = 0
+    model.sel_cnt = 0
+    
     return tot_acc_num / len(sql_data)
 
 
